@@ -1,33 +1,31 @@
 import express from "express";
-import { Sequelize } from "sequelize";
+import { sequelize } from "./src/config/db.js";
 import { ENV } from "./src/config/env.js";
 import authRoutes from './src/routes/authRoutes.js';
 import cors from 'cors';
+import User from "./src/models/User.js";
 
 const app = express();
-
-export const sequelize = new Sequelize(
-  ENV.DB_NAME,
-  ENV.DB_USER,
-  ENV.DB_PASSWORD,
-  {
-    host: ENV.DB_HOST,
-    dialect: "postgres",
-    port: ENV.DB_PORT,
-    logging: false,
-  }
-);
-
 app.use(express.json());
 app.use(cors());
 
 async function start() {
+  try {
+    await sequelize.authenticate();
+    console.log("✅ Conectado exitosamente a PostgreSQL");
+
+    await sequelize.sync({ alter: true });
+    console.log("🧩 Tablas sincronizadas correctamente");
+
     app.use('/api/auth', authRoutes);
 
     app.listen(ENV.PORT, () => {
-        console.log(`Server running on port ${ENV.PORT}`);
+      console.log(`🚀 Server running on port ${ENV.PORT}`);
     });
 
+  } catch (error) {
+    console.error("❌ Error al iniciar el servidor:", error);
+  }
 }
 
 start();
