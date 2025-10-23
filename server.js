@@ -2,6 +2,7 @@ import express from "express";
 import { sequelize } from "./src/config/db.js";
 import { ENV } from "./src/config/env.js";
 import authRoutes from './src/routes/authRoutes.js';
+import creditoRoutes from './src/routes/creditoRoutes.js';
 import cors from 'cors';
 import User from "./src/models/User.js";
 
@@ -18,6 +19,7 @@ async function start() {
     console.log("🧩 Tablas sincronizadas correctamente");
 
     app.use('/api/auth', authRoutes);
+    app.use('/api/creditos', creditoRoutes);
 
     app.listen(ENV.PORT, () => {
       console.log(`🚀 Server running on port ${ENV.PORT}`);
