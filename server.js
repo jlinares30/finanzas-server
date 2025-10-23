@@ -5,6 +5,8 @@ import authRoutes from './src/routes/authRoutes.js';
 import creditoRoutes from './src/routes/creditoRoutes.js';
 import cors from 'cors';
 import User from "./src/models/User.js";
+import Credito from "./src/models/Credito.js";
+import Vivienda from "./src/models/Vivienda.js";
 
 const app = express();
 app.use(express.json());
