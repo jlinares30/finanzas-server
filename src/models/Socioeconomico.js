@@ -29,7 +29,7 @@ const Socioeconomico = sequelize.define(
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-                model: "usuarios",
+                model: "users",
                 key: "id",
             },
         },

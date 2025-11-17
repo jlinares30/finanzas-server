@@ -1,4 +1,5 @@
 import PlanPagos from '../models/PlanPagos.js';
+import { PlanPagosService } from '../services/planPagosService.js';
 import { hash as _hash, compare } from 'bcrypt';
 
 
@@ -6,18 +7,11 @@ export async function createPlanPago(req, res) {
   const { num_cuota, interes, cuota, amortizacion, saldo, creditoId } = req.body;
 
   try {
-    const newPlanPago = await PlanPagos.create({
-      num_cuota,
-      interes,
-      cuota,
-      amortizacion,
-      saldo,
-      creditoId
-    });
-    res.status(201).json(newPlanPago);
+    const { monto, tasa, plazoMeses, tipoAmortizacion, fechaInicio } = req.body;
+    const plan = await PlanPagosService.generarPlan({ monto, tasa, plazoMeses, tipoAmortizacion, fechaInicio });
+    res.status(200).json(plan);
   } catch (error) {
-    console.error("Error creating PlanPago:", error);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(400).json({ error: error.message });
   }
 }
 

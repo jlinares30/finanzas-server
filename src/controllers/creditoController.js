@@ -11,7 +11,7 @@ export async function crearPlanCredito(req, res) {
     const resultado = FinancialCalculator.generarPlan({
       monto,
       tasaAnual,
-      meses,
+      meses,  
       metodo,
     });
 

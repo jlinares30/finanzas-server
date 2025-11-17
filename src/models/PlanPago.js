@@ -97,6 +97,15 @@ const PlanPago = sequelize.define(
         key: "id",
       },
     },
+    entidadFinancieraId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: "entidades_financieras",
+        key: "id"
+      }
+    },
+
   },
   {
     tableName: "plan_pagos",
