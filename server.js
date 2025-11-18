@@ -9,12 +9,15 @@ import planPagosRoutes from './src/routes/planPago.routes.js';
 import indicadoresRoutes from './src/routes/indicadores.routes.js';
 import cors from 'cors';
 import User from "./src/models/User.js";
-import PlanPagos from "./src/models/PlanPagos.js";
+import PlanPago from "./src/models/PlanPago.js";
 import EntidadFinanciera from "./src/models/EntidadFinanciera.js";
-import Cliente from "./src/models/Cliente.js";
-import Catalogo from "./src/models/Catalogo.js";
 import Cuota from "./src/models/Cuota.js";
 import IndicadorFinanciero from "./src/models/IndicadorFinanciero.js";
+import Local from "./src/models/Local.js";
+import CostoInicial from "./src/models/CostoInicial.js";
+import CostoPeriodico from "./src/models/CostoPeriodico.js";
+import Socioeconomico from "./src/models/Socioeconomico.js";
+import Hogar from "./src/models/Hogar.js";
 
 
 const app = express();
@@ -25,6 +28,28 @@ async function start() {
   try {
     await sequelize.authenticate();
     console.log("Conectado exitosamente a PostgreSQL");
+
+    User.hasOne(Socioeconomico, { foreignKey: "userId" });
+    Socioeconomico.belongsTo(User, { foreignKey: "userId" });
+
+    User.hasOne(Hogar, { foreignKey: "userId" });
+    Hogar.belongsTo(User, { foreignKey: "userId" });
+
+    PlanPago.hasMany(Cuota, { foreignKey: "planId" });
+    Cuota.belongsTo(PlanPago, { foreignKey: "planId" });
+
+    PlanPago.hasOne(IndicadorFinanciero, { foreignKey: "planId" });
+    IndicadorFinanciero.belongsTo(PlanPago, { foreignKey: "planId" });
+
+    Local.hasOne(CostoInicial, { foreignKey: "localId" });
+    CostoInicial.belongsTo(Local, { foreignKey: "localId" });
+
+    Local.hasOne(CostoPeriodico, { foreignKey: "localId" });
+    CostoPeriodico.belongsTo(Local, { foreignKey: "localId" });
+
+    EntidadFinanciera.hasMany(PlanPago, { foreignKey: "entidadFinancieraId" });
+    PlanPago.belongsTo(EntidadFinanciera, { foreignKey: "entidadFinancieraId" });
+
 
     await sequelize.sync({ alter: true });
     console.log("Tablas sincronizadas correctamente");

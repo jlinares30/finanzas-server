@@ -45,7 +45,7 @@ const IndicadorFinanciero = sequelize.define(
             type: DataTypes.INTEGER,
             allowNull: false,
             references: {
-                model: "planes_pago",
+                model: "plan_pagos",
                 key: "id",
             },
         },

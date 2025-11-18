@@ -1,5 +1,5 @@
-import { IndicadorFinanciero } from "../models/IndicadorFinanciero.model.js";
-import { Cuota } from "../models/Cuota.model.js";
+import IndicadorFinanciero from "../models/IndicadorFinanciero.js";
+import Cuota from "../models/Cuota.js";
 
   // GET indicadores por plan
   export async function getIndicadoresByPlan(req, res) {

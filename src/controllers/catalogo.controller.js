@@ -1,9 +1,8 @@
 import EntidadFinanciera from '../models/EntidadFinanciera.js';
 import Local from '../models/Local.js';
 
-export const catalogoController = {
   // GET /api/catalog/entidades-financieras
-  getEntidadesFinancieras: async (req, res) => {
+export async function getEntidadesFinancieras(req, res) {
     try {
       const { moneda } = req.query;
       
@@ -16,10 +15,10 @@ export const catalogoController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
-  },
+  }
 
   // GET /api/catalog/locales
-  getLocales: async (req, res) => {
+  export async function getLocales(req, res) {
     try {
       const locales = await Local.findAll({ 
         where: { /* condiciones si las hay */ },
@@ -30,10 +29,10 @@ export const catalogoController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
-  },
+  }
 
   // GET /api/catalog/locales/:id
-  getLocalById: async (req, res) => {
+  export async function getLocalById(req, res) {
     try {
       const { id } = req.params;
       
@@ -50,4 +49,4 @@ export const catalogoController = {
       res.status(500).json({ error: error.message });
     }
   }
-};
+  
