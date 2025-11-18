@@ -24,7 +24,7 @@ const EntidadFinanciera = sequelize.define(
       allowNull: false,
     },
      // solo aplica si es nominal
-    frecuencia_capitalizacion: {
+    capitalizacion: {
       type: DataTypes.INTEGER,
       allowNull: true,       
     },

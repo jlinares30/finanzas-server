@@ -21,7 +21,7 @@ const Socioeconomico = sequelize.define(
             type: DataTypes.STRING,
             allowNull: false,
         },
-        nivel_esducativo: {
+        nivel_educativo: {
             type: DataTypes.STRING,
             allowNull: false,
         },

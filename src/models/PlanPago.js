@@ -53,30 +53,30 @@ const PlanPago = sequelize.define(
       type: DataTypes.DECIMAL(15, 2),
       allowNull: false,
     },
-    van: {
-      type: DataTypes.DECIMAL(15, 2),
-      allowNull: false,
-    },
-    tir: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-    },
-    tcea: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-    },
-    trea: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-    },
-    duracion: {
-      type: DataTypes.DECIMAL(10, 4),
-      allowNull: false,
-    },
-    convexidad: {
-      type: DataTypes.DECIMAL(10, 4),
-      allowNull: false,
-    },
+    // van: {
+    //   type: DataTypes.DECIMAL(15, 2),
+    //   allowNull: false,
+    // },
+    // tir: {
+    //   type: DataTypes.DECIMAL(10, 2),
+    //   allowNull: false,
+    // },
+    // tcea: {
+    //   type: DataTypes.DECIMAL(10, 2),
+    //   allowNull: false,
+    // },
+    // trea: {
+    //   type: DataTypes.DECIMAL(10, 2),
+    //   allowNull: false,
+    // },
+    // duracion: {
+    //   type: DataTypes.DECIMAL(10, 4),
+    //   allowNull: false,
+    // },
+    // convexidad: {
+    //   type: DataTypes.DECIMAL(10, 4),
+    //   allowNull: false,
+    // },
     reporte_url: {
       type: DataTypes.STRING,
       allowNull: true,

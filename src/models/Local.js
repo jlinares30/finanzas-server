@@ -39,26 +39,26 @@ const Local = sequelize.define(
         allowNull: false,
         defaultValue: "USD",
     },
-    tipo_tasa: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        defaultValue: "fija",
-    },
-    tasa_interes_anual: {
-        type: DataTypes.DECIMAL(5, 2),
-        allowNull: false,
-        defaultValue: 0,
-    },
-    periodo_gracia: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0,
-    },
-    capitalizacion: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        defaultValue: "mensual",
-    },
+    // tipo_tasa: {
+    //     type: DataTypes.STRING,
+    //     allowNull: false,
+    //     defaultValue: "fija",
+    // },
+    // tasa_interes_anual: {
+    //     type: DataTypes.DECIMAL(5, 2),
+    //     allowNull: false,
+    //     defaultValue: 0,
+    // },
+    // periodo_gracia: {
+    //     type: DataTypes.INTEGER,
+    //     allowNull: false,
+    //     defaultValue: 0,
+    // },
+    // capitalizacion: {
+    //     type: DataTypes.STRING,
+    //     allowNull: false,
+    //     defaultValue: "mensual",
+    // },
   },
   {
     tableName: "locales",
