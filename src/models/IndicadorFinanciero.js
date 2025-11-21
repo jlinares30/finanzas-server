@@ -11,34 +11,34 @@ const IndicadorFinanciero = sequelize.define(
         },
         tir: {
             type: DataTypes.DECIMAL(10, 2),
-            allowNull: false,
+            allowNull: true,
         },
         van: {
             type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
+            allowNull: true,
         },
         tcea: {
-            type: DataTypes.DECIMAL(10, 2),
-            allowNull: false,
+            type: DataTypes.DECIMAL(15, 2),
+            allowNull: true,
         },
         trea: {
-            type: DataTypes.DECIMAL(10, 2),
-            allowNull: false,
+            type: DataTypes.DECIMAL(15, 2),
+            allowNull: true,
         },
         duracion: {
-            type: DataTypes.DECIMAL(10, 4),
+            type: DataTypes.DECIMAL(15, 4),
             allowNull: false,
         },
         convexidad: {
-            type: DataTypes.DECIMAL(10, 4),
+            type: DataTypes.DECIMAL(15, 4),
             allowNull: false,
         },
         tea: {
-            type: DataTypes.DECIMAL(10, 2),
+            type: DataTypes.DECIMAL(15, 2),
             allowNull: false,
         },
         tasa_descuento: {
-            type: DataTypes.DECIMAL(10, 2),
+            type: DataTypes.DECIMAL(15, 2),
             allowNull: false,
         },
         planId: {

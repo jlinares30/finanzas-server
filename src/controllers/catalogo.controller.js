@@ -50,3 +50,13 @@ export async function getEntidadesFinancieras(req, res) {
     }
   }
   
+
+  export async function createLocal(req, res) {
+    try {
+      const { nombre, precio, tipo, direccion, sueldo_minimo, imagen_url, moneda } = req.body;
+      const local = await Local.create({ nombre, precio, tipo, direccion, sueldo_minimo, imagen_url, moneda });
+      res.status(201).json({ local });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
