@@ -1,3 +1,4 @@
-export function TCEA(tasaMensual) {
-  return Math.pow(1 + tasaMensual, 12) - 1;
+export function TCEA(tirMensual) {
+  if (tirMensual === null || !isFinite(tirMensual)) return null;
+  return Math.pow(1 + tirMensual, 12) - 1;
 }

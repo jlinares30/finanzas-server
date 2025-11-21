@@ -1,5 +1,5 @@
 export function metodoFrances(monto, tasaMensual, numCuotas, fechaInicio) {
-  const cuota = (monto * tasaMensual) / (1 - Math.pow(1 + tasaMensual, -numCuotas));
+/*   const cuota = (monto * tasaMensual) / (1 - Math.pow(1 + tasaMensual, -numCuotas));
   let saldo = monto;
   const cuotas = [];
 
@@ -17,5 +17,9 @@ export function metodoFrances(monto, tasaMensual, numCuotas, fechaInicio) {
     });
   }
 
-  return cuotas;
+  return cuotas; */
+
+  const cuota = (monto * tasaMensual) / (1 - Math.pow(1 + tasaMensual, -numCuotas));
+
+  return cuota;
 }

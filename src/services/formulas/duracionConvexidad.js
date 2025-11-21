@@ -1,12 +1,22 @@
-function Duracion(flujos, r) {
-  const numerador = flujos.reduce((acc, f, t) => acc + t * (f / Math.pow(1+r, t)), 0);
-  const denominador = flujos.reduce((acc, f, t) => acc + (f / Math.pow(1+r, t)), 0);
-  return numerador / denominador;
+export function Duracion(flujos, r) {
+  const denom = flujos.reduce((acc, f, t) => acc + f / Math.pow(1+r, t), 0);
+
+  if (denom === 0) return null;
+
+  const numer = flujos.reduce((acc, f, t) => acc + t * (f / Math.pow(1+r, t)), 0);
+
+  return numer / denom;
 }
 
-function Convexidad(flujos, r) {
-  const numerador = flujos.reduce((acc, f, t) => acc + (f * t * (t+1)) / Math.pow(1+r, t+2), 0);
-  const denominador = flujos.reduce((acc, f, t) => acc + (f / Math.pow(1+r, t)), 0);
-  return numerador / denominador;
+export function Convexidad(flujos, r) {
+  const denom = flujos.reduce((acc, f, t) => acc + f / Math.pow(1+r, t), 0);
+
+  if (denom === 0) return null;
+
+  const numer = flujos.reduce(
+    (acc, f, t) => acc + (f * t * (t+1)) / Math.pow(1+r, t+2),
+    0
+  );
+
+  return numer / denom;
 }
-export { Duracion, Convexidad };

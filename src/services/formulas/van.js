@@ -1,5 +1,6 @@
-export function calcularVAN(flujos, tasaDescuento) {
-  return flujos.reduce((acum, flujo, i) => {
-    return acum + flujo / Math.pow(1 + tasaDescuento, i + 1);
-  }, 0);
+export function calcularVAN(flujos, tasa) {
+  return flujos.reduce(
+    (acc, f, t) => acc + f / Math.pow(1 + tasa, t),
+    0
+  );
 }

@@ -11,3 +11,12 @@ export function convertirTasa({ tipo, tasa, capitalizaciones }) {
     throw new Error('Tipo de conversión no válido');
   }
 }
+
+
+export function nominalToTEA(tasaNominal, m) {
+  return Math.pow(1 + tasaNominal / m, m) - 1;
+}
+
+export function teaToTEM(tasaEfectivaAnual) {
+  return Math.pow(1 + tasaEfectivaAnual, 1 / 12) - 1;
+}
