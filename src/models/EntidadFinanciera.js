@@ -9,7 +9,6 @@ const EntidadFinanciera = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-
     nombre: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -23,57 +22,59 @@ const EntidadFinanciera = sequelize.define(
       type: DataTypes.DECIMAL(10, 6),
       allowNull: false,
     },
-     // solo aplica si es nominal
+
+    // aplica solo para EFECTIVA
+    frecuencia_efectiva: {
+      type: DataTypes.ENUM(
+      "ANUAL", "SEMESTRAL", "TRIMESTRAL","CUATRIMESTRAL","BIMESTRAL", "MENSUAL"),
+      allowNull: true,
+    },
+    //------------------ SOLO para tasas nominales
+    frecuencia_nominal: {
+      type: DataTypes.ENUM(
+        "ANUAL", "SEMESTRAL", "TRIMESTRAL","CUATRIMESTRAL","BIMESTRAL", "MENSUAL", "DIARIA"),
+      allowNull: true,
+    },
+
+    //Tipos de capitalizacion
+    // m = 360 → diaria
+    // m = 12 → mensual
+    // m = 6 → bimestral
+    // m = 4 → trimestral
+    // m = 3 → cuatrimestral
+    // m = 2 → semestral
+    // m = 1 → anual
+
+    // solo aplica si es nominal
     capitalizacion: {
       type: DataTypes.INTEGER,
       allowNull: true,       
     },
 
+    //----------------------------
     moneda: {
       type: DataTypes.ENUM("PEN", "USD"),
       allowNull: false,
     },
-
-    seguro_desgravamen: {
-      type: DataTypes.DECIMAL(10, 6),
+    //regla si aplica seguro desgravamen
+    aplica_seguro_desgravamen: {
+      type: DataTypes.BOOLEAN,
       allowNull: false,
-      defaultValue: 0,
+      defaultValue: false,
     },
-    seguro_inmueble: {
-      type: DataTypes.DECIMAL(10, 6),
-      allowNull: false,
-      defaultValue: 0,
-    },
-    comision_mensual: {
-      type: DataTypes.DECIMAL(10, 6),
-      allowNull: false,
-      defaultValue: 0,
-    },
-    gastos_administrativos: {
-      type: DataTypes.DECIMAL(10, 6),
-      allowNull: false,
-      defaultValue: 0,
-    },
-
-
     aplica_bono_techo_propio: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
       defaultValue: false,
     },
-
-
-    gracia_total_max: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 0,
+    periodos_gracia_permitidos: {
+      type: DataTypes.ENUM("SIN_GRACIA", "PARCIAL", "TOTAL"),
+      allowNull: false
     },
-    gracia_parcial_max: {
+    max_meses_gracia: {
       type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 0,
+      allowNull: true
     },
-
     activo: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,

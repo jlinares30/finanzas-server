@@ -9,17 +9,14 @@ const CostoInicial = sequelize.define(
             primaryKey: true,
             autoIncrement: true,
         },
-        porcentaje_seguro_desgravamen: {
-            type: DataTypes.DECIMAL(5, 2),
-            allowNull: false,
-        },
         costes_notariales: {
             type: DataTypes.DECIMAL(15, 2),
             allowNull: false,
         },
+        // si es pago unico aplica seguro de riesgo en la cuota inicial
         seguro_riesgo: {
             type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
+            allowNull: true,
         },
         costes_registrales: {
             type: DataTypes.DECIMAL(15, 2),
@@ -34,10 +31,6 @@ const CostoInicial = sequelize.define(
             allowNull: false,
         },
         comision_activacion: {
-            type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
-        },
-        seguro_desgravamen: {
             type: DataTypes.DECIMAL(15, 2),
             allowNull: false,
         },

@@ -41,19 +41,7 @@ const Cuota = sequelize.define(
             type: DataTypes.DECIMAL(15, 2),
             allowNull: false,
         },
-        seguro_riesgo: {
-            type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
-        },
         comision: {
-            type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
-        },
-        portes: {
-            type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
-        },
-        gastos_administrativos: {
             type: DataTypes.DECIMAL(15, 2),
             allowNull: false,
         },

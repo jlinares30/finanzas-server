@@ -25,40 +25,14 @@ const Local = sequelize.define(
         type: DataTypes.STRING,
       allowNull: false,
     },
-    sueldo_minimo: {
-        type: DataTypes.DECIMAL(15, 2),
-        allowNull: false,
-        defaultValue: 0,
-    },
     imagen_url: {
         type: DataTypes.STRING,
         allowNull: true,
     },
     moneda: {
-        type: DataTypes.STRING,
+        type: DataTypes.ENUM("PEN", "USD"),
         allowNull: false,
-        defaultValue: "USD",
     },
-    // tipo_tasa: {
-    //     type: DataTypes.STRING,
-    //     allowNull: false,
-    //     defaultValue: "fija",
-    // },
-    // tasa_interes_anual: {
-    //     type: DataTypes.DECIMAL(5, 2),
-    //     allowNull: false,
-    //     defaultValue: 0,
-    // },
-    // periodo_gracia: {
-    //     type: DataTypes.INTEGER,
-    //     allowNull: false,
-    //     defaultValue: 0,
-    // },
-    // capitalizacion: {
-    //     type: DataTypes.STRING,
-    //     allowNull: false,
-    //     defaultValue: "mensual",
-    // },
   },
   {
     tableName: "locales",

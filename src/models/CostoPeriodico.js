@@ -9,9 +9,10 @@ const CostoPeriodico = sequelize.define(
             primaryKey: true,
             autoIncrement: true,
         },
+        // aplica si hay seguro contra todo riesgo en la cuota recurrente
         seguro_contra_todo_riesgo: {
             type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
+            allowNull: true,
         },
         comision_periodica: {
             type: DataTypes.DECIMAL(15, 2),
