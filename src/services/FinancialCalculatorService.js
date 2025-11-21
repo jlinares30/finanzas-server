@@ -1,5 +1,5 @@
 import { metodoFrances } from "./formulas/metodoFrances.js";
-import { convertirTasa } from "./formulas/conversionTasas.js";
+import { convertirTasa, nominalToTEA, teaToTEM } from "./formulas/conversionTasas.js";
 import { calcularTIR as tir } from "./formulas/tir.js";
 import { calcularVAN as van } from "./formulas/van.js";
 import { amortizacionPeriodo } from "./formulas/amortizacionPeriodo.js";
@@ -12,6 +12,8 @@ export const FinancialCalculatorService = {
   convertirMoneda,
   metodoFrances,
   convertirTasa,
+  nominalToTEA,
+  teaToTEM,
   interesPeriodo,
   tir,
   van,
