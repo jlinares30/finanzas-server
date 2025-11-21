@@ -42,7 +42,7 @@ const PlanPago = sequelize.define(
       allowNull: false,
     },
     bono_aplicable: {
-      type: DataTypes.DECIMAL(5, 2),
+      type: DataTypes.DECIMAL(15, 2),
       allowNull: false,
     },
     cuota_fija: {
