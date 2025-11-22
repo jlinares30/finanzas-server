@@ -1,4 +1,4 @@
-import { sequelize } from "../config/db.js";
+// src/services/planPago.service.js
 import EntidadFinanciera from "../models/EntidadFinanciera.js";
 import Local from "../models/Local.js";
 import PlanPago from "../models/PlanPago.js";
@@ -7,268 +7,457 @@ import Cuota from "../models/Cuota.js";
 import IndicadorFinanciero from "../models/IndicadorFinanciero.js";
 import CostoInicial from "../models/CostoInicial.js";
 import CostoPeriodico from "../models/CostoPeriodico.js";
-
+import { sequelize } from "../config/db.js";
 import { FinancialCalculatorService as calc } from "./FinancialCalculatorService.js";
 
-function round(value, decimals = 2) {
-  if (!isFinite(value) || value === null) return null;
-  const factor = Math.pow(10, decimals);
-  return Math.round((value + Number.EPSILON) * factor) / factor;
-}
 /**
- * Data: objeto con todos los parámetros que se envía desde el controller.
- * Espera:
- *  - localId, userId, entidadFinancieraId
- *  - precio_venta, cuota_inicial, bono_aplicable
- *  - num_anios, frecuencia_pago ("mensual" o "anual")
- *  - tipo_tasa ("nominal" o "efectiva")
- *  - tasa_interes_anual (como 0.12 para 12%)
- *  - capitalizacion (ej "mensual" o número de periodos m)
- *  - tipo_gracia ("SIN_GRACIA","TOTAL","PARCIAL")
- *  - meses_gracia (int)
+ * Helper: safe number
  */
-export async function generarPlanPagoService(data) {
+const toNum = (v) => (v == null || v === "" ? 0 : Number(v));
+
+/**
+ * Redondeo monetario (2 decimales)
+ */
+const money = (v) => Number(Number(v).toFixed(2));
+
+/**
+ * Devuelve m (capitalizaciones) a partir de capitalization enum o número
+ */
+function getMFromCapitalizacion(cap) {
+
+  if (typeof cap === "number") return cap;
+
+  switch ((cap || "").toString().toLowerCase()) {
+    case "mensual":
+    case "m":
+    case "12":
+      return 12;
+    case "bimestral":
+    case "b":
+    case "6":
+      return 6;
+    case "trimestral":
+    case "4":
+      return 4;
+    case "cuatrimestral":
+      return 3;
+    case "semestral":
+      return 2;
+    case "anual":
+      return 1;
+    case "diaria":
+    case "360":
+      return 360;
+    default:
+      return 12;
+  }
+}
+
+export const generarPlanPagoService = async (data) => {
+  const {
+    localId,
+    userId,
+    entidadFinancieraId,
+    precio_venta,
+    cuota_inicial = 0,
+    bono_aplicable = 0,
+    num_anios,
+    frecuencia_pago = "mensual",
+    // tipo_tasa: 'EFECTIVA'|'NOMINAL' - si no viene, se toma de la entidad
+    tipo_tasa: tipo_tasa_input,
+    tasa_interes_anual: tasa_input,
+    capitalizacion: capitalizacion_input,
+    // tipo de gracia: { tipo: "SIN_GRACIA"|"PARCIAL"|"TOTAL", meses: 0 }
+    periodo_gracia = { tipo: "SIN_GRACIA", meses: 0 },
+  } = data;
+
+  // -------------------- VALIDACIONES BASICAS --------------------
+  if (!localId || !userId || !entidadFinancieraId) {
+    throw new Error("Faltan ids obligatorios (localId | userId | entidadFinancieraId).");
+  }
+
+  const entidad = await EntidadFinanciera.findByPk(entidadFinancieraId);
+  if (!entidad) throw new Error("Entidad financiera no encontrada");
+
+  const local = await Local.findByPk(localId);
+  if (!local) throw new Error("Local no encontrado");
+
+  const user = await User.findByPk(userId);
+  if (!user) throw new Error("Usuario no encontrado");
+
+  // -------------------- OBTENER COSTOS DEFINIDOS PARA EL LOCAL --------------------
+  const costoInicial = (await CostoInicial.findOne({ where: { localId } })) || null;
+  const costoPeriodico = (await CostoPeriodico.findOne({ where: { localId } })) || null;
+
+  // -------------------- DETERMINAR TASAS A USAR --------------------
+  // Prioriza los valores pasados en body; si no vienen usa los de la entidad
+  const tipo_tasa = tipo_tasa_input ? tipo_tasa_input.toUpperCase() : (entidad.tipo_tasa || "NOMINAL");
+  const tasa_origen = tasa_input != null ? toNum(tasa_input) : toNum(entidad.tasa_interes);
+  const capitalizacion = capitalizacion_input ?? entidad.capitalizacion ?? 12;
+
+  // --- convertir a TEA (si es necesario) ---
+  // asumimos tasa_origen viene en formato decimal (ej: 0.12 para 12%)
+  let TEA = tasa_origen;
+  if (tipo_tasa === "NOMINAL") {
+    // m: número de capitalizaciones por año
+    const m = getMFromCapitalizacion(capitalizacion);
+
+    if (!calc.nominalToTEA) throw new Error("Falta función nominalToTEA en FinancialCalculatorService");
+    TEA = calc.nominalToTEA(tasa_origen, m); // devuelve decimal (0.125)
+  } else {
+    // EFECTIVA: aqui se podria necesitar usar frecuencia_efectiva; asumo TEA directa en entidad
+    TEA = tasa_origen;
+  }
+
+  // --- TEM: tasa por periodo de pago (mensual si frecuencia_pago mensual) ---
+  // Normalizamos: frecuencia_pago 'mensual' => periodo mensual
+  const periodoPorAnno = frecuencia_pago === "mensual" ? 12 : 1; // si soportas otras frecuencias, ampliar
+  // convertimos TEA -> tasa por periodo (TEM)
+  if (!calc.teaToTEM) throw new Error("Falta función teaToTEM en FinancialCalculatorService");
+  const TEM = calc.teaToTEM(TEA, periodoPorAnno === 12 ? 12 : periodoPorAnno); // la impl puede ignorar 2o arg
+  
+  // -------------------- MONTO FINANCIADO / BONO --------------------
+  // Validar si entidad permite bono
+  if (toNum(bono_aplicable) > 0 && !entidad.aplica_bono_techo_propio) {
+    throw new Error("Entidad financiera no permite bono techo propio");
+  }
+
+  // monto prestamo bruto solicitado (precio - cuota inicial - bono)
+  const monto_prestamo_bruto = money(toNum(precio_venta) - toNum(cuota_inicial) - toNum(bono_aplicable));
+  if (monto_prestamo_bruto <= 0) {
+    throw new Error("Monto del préstamo inválido o <= 0");
+  }
+
+  // -------------------- COSTOS INICIALES (CÓMO LOS TRATAMOS) --------------------
+  // Regla (ajustable): 
+  // - comision_activacion se financia (se resta del desembolso entregado al cliente)
+  // - el resto de costos iniciales (notariales, registrales, tasacion, seguro_riesgo inicial) se pagan al contado por el cliente (se restan del flujo neto recibido)
+  const comisionActivacion = costoInicial ? toNum(costoInicial.comision_activacion || 0) : 0;
+  const comisionEstudio = costoInicial ? toNum(costoInicial.comision_estudio || 0) : 0;
+  const costesNotariales = costoInicial ? toNum(costoInicial.costes_notariales || 0) : 0;
+  const costesRegistrales = costoInicial ? toNum(costoInicial.costes_registrales || 0) : 0;
+  const tasacion = costoInicial ? toNum(costoInicial.tasacion || 0) : 0;
+  const seguroRiesgoInicial = costoInicial ? toNum(costoInicial.seguro_riesgo || 0) : 0;
+
+  // Sumatorias
+  const initialCostsPaidByClient = money(costesNotariales + costesRegistrales + tasacion + seguroRiesgoInicial + comisionEstudio);
+  const initialCostsFinanced = money(comisionActivacion); // se descuenta del desembolso
+  
+  // Nota: ajustar según regla real: algunas entidades descuentan comisiones del préstamo, otras no.
+
+  // -------------------- MONTOS NETOS AL DESEMBOLSO (LO QUE RECIBE CLIENTE) --------------------
+  // monto_prestamo_bruto es el monto nominal a financiar (lo que se otorga en el contrato)
+  // monto_neto_desembolso = monto prestamo - comisiones descontadas (financed) - otros descuentos aplicables
+  const monto_neto_desembolso = money(monto_prestamo_bruto - initialCostsFinanced);
+
+  // -------------------- PERIODOS TOTALES Y MANEJO DE GRACIA --------------------
+  const cuotas_por_anio = frecuencia_pago === "mensual" ? 12 : 1;
+  const total_cuotas = toNum(num_anios) * cuotas_por_anio;
+
+  // periodo_gracia: { tipo: "SIN_GRACIA"/"PARCIAL"/"TOTAL", meses: n }
+  const tipoGracia = (periodo_gracia && periodo_gracia.tipo) ? periodo_gracia.tipo : "SIN_GRACIA";
+  const mesesGracia = (periodo_gracia && periodo_gracia.meses) ? toNum(periodo_gracia.meses) : 0;
+
+  if (mesesGracia > (entidad.max_meses_gracia || 0)) {
+    throw new Error(`Entidad permite máximo ${entidad.max_meses_gracia || 0} meses de gracia`);
+  }
+
+  // Balance inicial sobre el que se calculan cuotas:
+  // Si gracia total: intereses capitalizados -> saldo incrementado
+  // Si gracia parcial: saldo inicial igual al monto_prestamo_bruto (intereses se pagan durante gracia), cuotas posteriores se calculan sobre saldo original
+  let saldoInicialParaAmortizar = monto_prestamo_bruto;
+  if (tipoGracia === "TOTAL" && mesesGracia > 0) {
+    // capitalizamos intereses por mesesGracia
+    saldoInicialParaAmortizar = money(monto_prestamo_bruto * Math.pow(1 + TEM, mesesGracia));
+  }
+
+  // Si hay parcial, las cuotas del periodo de gracia serán solo interes + periodic costs (sin amortización)
+  const mesesGraciaParcial = tipoGracia === "PARCIAL" ? mesesGracia : 0;
+  const mesesGraciaTotal = tipoGracia === "TOTAL" ? mesesGracia : 0;
+  const mesesGraciaUsados = mesesGraciaParcial || mesesGraciaTotal || 0;
+
+  // Ajuste del número de cuotas que realmente amortizan:
+  const cuotasQueAmortizan = total_cuotas - mesesGraciaUsados;
+  if (cuotasQueAmortizan <= 0) {
+    throw new Error("Periodo de gracia excede el total de cuotas");
+  }
+
+  // -------------------- CALCULO DE CUOTA METODO FRANCES (en periodos que amortizan) --------------------
+
+  // Aseguramos que calc.metodoFrances devuelva cuota fija cuando le pasamos (monto, tasaPeriodo, nCuotas)
+  if (!calc.metodoFrances) throw new Error("Falta metodoFrances en FinancialCalculatorService");
+  const cuotaFija = money(calc.metodoFrances(saldoInicialParaAmortizar, TEM, cuotasQueAmortizan, /*fechaInicio*/ null));
+
+  // -------------------- COSTOS PERIODICOS (se agregan a cada cuota) --------------------
+  const costoPeriodoComision = costoPeriodico ? toNum(costoPeriodico.comision_periodica || 0) : 0;
+  const costoPeriodoPortes = costoPeriodico ? toNum(costoPeriodico.portes || 0) : 0;
+  const costoPeriodoGastosAdministrativos = costoPeriodico ? toNum(costoPeriodico.gastos_administrativos || 0) : 0;
+  // Entidad puede definir comision_mensual, gastos_administrativos
+  const entidadComisionMensual = toNum(entidad.comision_mensual || 0);
+  const entidadGastosAdministrativos = toNum(entidad.gastos_administrativos || 0);
+  // Si entidad aplica seguro desgravamen como porcentaje:
+  const aplicaSeguroDesgrav = entidad.aplica_seguro_desgravamen === true;
+  const seguroDesgravPorcentaje = toNum(entidad.seguro_desgravamen || 0); // ej 0.0005
+
+  // -------------------- GENERAR TABLAS DE CUOTAS Y FLUJOS --------------------
+  // Convention: flujos[0] = monto neto recibido por cliente (positivo), siguientes flujos son negativos (pagos)
+  // ------------------------------------------------------------------
+  const cuotas = [];
+  const flujos = [];
+
+  // Flujo inicial (t=0):
+  // consideramos que cliente recibe "monto_neto_desembolso" y en t0 paga initialCostsPaidByClient (si los paga fuera del préstamo).
+  // Entonces flujo neto t0 = monto_neto_desembolso - initialCostsPaidByClient
+  const flujoInicial = money(monto_neto_desembolso - initialCostsPaidByClient);
+  flujos.push(flujoInicial);
+
+  // Si hay meses de gracia total: durante esos meses no hay pagos (o solo costos periódicos si se aplican)
+  // Si hay meses de gracia parcial: durante esos meses se paga interés (salarios) + costos periódicos, amortización=0
+
+  // track saldo para amortizacion
+  let saldo = saldoInicialParaAmortizar;
+
+  // Si hay "mesesGraciaTotal", en algunos reglamentos evita cualquier pago (pero entidad puede requerir seguros periódicos).
+  // En esta implementacion, si hay grace total, el cliente no paga amortizacion ni intereses durante los meses de gracia,
+  // pero si hay costos periodicos o seguros periódicos, decidimos que se pueden cobrar (opcional).
+  // Aquí implementamos:
+  // - Gracia total: intereses capitalizados (ya aplicado), y cobraremos SOLO costos periódicos (si aplica) en cada periodo (opcional).
+  // - Gracia parcial: cobramos intereses (saldo*TEM) + costos periódicos en cada periodo, sin amortizacion.
+
+  //--------------- GENERAR MESES DE GRACIA ----------- (si existe)
+  for (let g = 1; g <= mesesGraciaUsados; g++) {
+    let interes = 0;
+    let amortizacion = 0;
+    let cuota = 0;
+
+    if (tipoGracia === "TOTAL") {
+      // no interesa (ya capitalizado), cuota = costos periodicos si hay (podría ser 0)
+      interes = 0;
+      amortizacion = 0;
+      cuota = 0;
+    } else if (tipoGracia === "PARCIAL") {
+      // solo intereses
+      interes = money(saldo * TEM);
+      amortizacion = 0;
+      cuota = interes;
+    }
+
+    // seguros/comisiones/gastos periódicos se suman
+    const seguro_desgravamen = aplicaSeguroDesgrav ? money(seguroDesgravPorcentaje * saldo) : 0;
+    const seguro_riesgo_periodico = toNum(entidad.seguro_inmueble || 0); // si existiera
+    const comision_total = money(entidadComisionMensual + costoPeriodoComision);
+    const portes = money(costoPeriodoPortes);
+    const gastosAdmin = money(entidadGastosAdministrativos + costoPeriodoGastosAdministrativos);
+
+    const cuotaTotal = money(cuota + seguro_desgravamen + seguro_riesgo_periodico + comision_total + portes + gastosAdmin);
+
+    // flujo: salida del cliente -> negativo
+    flujos.push(-cuotaTotal);
+
+    cuotas.push({
+      numero: g,
+      saldo_inicial: money(saldo),
+      saldo_inicial_indexado: money(saldo),
+      interes: money(interes),
+      cuota: money(cuotaTotal),
+      amortizacion: money(amortizacion),
+      prepago: 0,
+      seguro_desgravamen: seguro_desgravamen,
+      seguro_riesgo: seguro_riesgo_periodico,
+      comision: comision_total,
+      portes: portes,
+      gastos_administrativos: gastosAdmin,
+      saldo_final: money(saldo - amortizacion),
+      flujo: -cuotaTotal,
+    });
+
+    // si parcial: saldo no cambia; si total: saldo no cambia (capitalizado ya)
+  }
+
+  //------------------- GENERA CUOTAS QUE AMORTIZAN (restantes)----------------------
+  for (let i = 1; i <= cuotasQueAmortizan; i++) {
+    const periodo = mesesGraciaUsados + i;
+    const interes = money(saldo * TEM);
+    const amortizacion = money(cuotaFija - interes);
+    // en edge cases amortizacion puede ser negativo si cuotaFija < interes -> validar
+    const saldo_final = money(saldo - amortizacion);
+
+    const seguro_desgravamen = aplicaSeguroDesgrav ? money(seguroDesgravPorcentaje * saldo) : 0;
+    const seguro_riesgo_periodico = toNum(entidad.seguro_inmueble || 0);
+    const comision_total = money(entidadComisionMensual + costoPeriodoComision);
+    const portes = money(costoPeriodoPortes);
+    const gastosAdmin = money(entidadGastosAdministrativos + costoPeriodoGastosAdministrativos);
+
+    const cuotaTotal = money(cuotaFija + seguro_desgravamen + seguro_riesgo_periodico + comision_total + portes + gastosAdmin);
+
+    flujos.push(-cuotaTotal);
+
+    cuotas.push({
+      numero: periodo,
+      saldo_inicial: money(saldo),
+      saldo_inicial_indexado: money(saldo),
+      interes: money(interes),
+      cuota: money(cuotaTotal),
+      amortizacion: money(amortizacion),
+      prepago: 0,
+      seguro_desgravamen,
+      seguro_riesgo: seguro_riesgo_periodico,
+      comision: comision_total,
+      portes,
+      gastos_administrativos: gastosAdmin,
+      saldo_final,
+      flujo: -cuotaTotal,
+    });
+
+    saldo = saldo_final;
+  }
+
+  // Enfoque: flujos[] = [t0, t1, t2, ...] con t0 positivo (lo que recibió el cliente), siguientes negativos (pagos)
+  // -------------------- CALCULO INDICADORES FINANCIEROS --------------------
+  // VAN: usamos tasa de descuento igual a TEM (se puede adaptar a otra tasa)
+  const tasa_descuento_periodica = TEM; // por periodo
+  let van = null;
+  let tir = null;
+  let tcea = null;
+  let duracion = null;
+  let convexidad = null;
+
+  try {
+
+    if (!calc.van || !calc.tir || !calc.TCEA || !calc.Duracion || !calc.Convexidad) {
+      throw new Error("Faltan funciones financieras en FinancialCalculatorService (van, tir, TCEA, Duracion, Convexidad)");
+    }
+
+    // VAN: convención: van(flujos, tasaPeriodo).
+    van = money(calc.van(flujos, tasa_descuento_periodica));
+
+    // TIR: la función espera flujos (con signo). Puede devolver null si no existe.
+    tir = calc.tir(flujos);
+    if (tir == null || !isFinite(tir)) {
+      tir = null;
+      tcea = null;
+    } else {
+      // convertir a TCEA anual
+      tcea = money(calc.TCEA(tir));
+    }
+
+    // Duracion / Convexidad: si calc asume r como tasa periódica (p. ej. TEM), usar TEM o tir según convención
+    // Normalmente usamos r = tasa_descuento_periodica (TEM)
+    duracion = calc.Duracion(flujos, tasa_descuento_periodica);
+    convexidad = calc.Convexidad(flujos, tasa_descuento_periodica);
+
+    // PROTEGER VALORES NO FINITOS
+    duracion = isFinite(duracion) ? Number(duracion.toFixed(4)) : null;
+    convexidad = isFinite(convexidad) ? Number(convexidad.toFixed(4)) : null;
+  } catch (err) {
+    // si falla cálculo de indicadores, seguimos pero con valores null
+    van = van ?? null;
+    tir = tir ?? null;
+    tcea = tcea ?? null;
+    duracion = duracion ?? null;
+    convexidad = convexidad ?? null;
+    console.warn("Advertencia: error calculando indicadores:", err.message || err);
+  }
+
+  // -------------------- GUARDAR TODO EN BD CON TRANSACCIÓN --------------------
   const t = await sequelize.transaction();
   try {
-    // -------------------- EXTRAER Y VALIDAR INPUTS --------------------
-    const {
-      localId,
-      userId,
-      entidadFinancieraId,
-      precio_venta,
-      cuota_inicial = 0,
-      bono_aplicable = 0,
-      num_anios,
-      frecuencia_pago = "mensual",
-      tipo_tasa = "efectiva",
-      tasa_interes_anual,
-      capitalizacion = "mensual",
-      tipo_gracia = "SIN_GRACIA",
-      meses_gracia = 0,
-      moneda = undefined
-    } = data;
-
-    // validaciones básicas
-    if (!localId || !userId || !entidadFinancieraId) {
-      throw new Error("Debe enviarse localId, userId y entidadFinancieraId");
-    }
-    if (!precio_venta || !num_anios || tasa_interes_anual == null) {
-      throw new Error("Datos incompletos: precio_venta, num_anios y tasa_interes_anual son obligatorios");
-    }
-
-    const entidad = await EntidadFinanciera.findByPk(entidadFinancieraId);
-    if (!entidad) throw new Error("Entidad financiera no encontrada");
-
-    const local = await Local.findByPk(localId);
-    if (!local) throw new Error("Local no encontrado");
-
-    const usuario = await User.findByPk(userId);
-    if (!usuario) throw new Error("Usuario no encontrado");
-
-    // Traer costos asociados al local (si existen)
-    const costoInicial = await CostoInicial.findOne({ where: { localId }});
-    const costoPeriodico = await CostoPeriodico.findOne({ where: { localId }});
-
-    // -------------------- TASAS: CONVERTIR A TEA/TEM --------------------
-    // se asume tasa_interes_anual en forma decimal (0.12 -> 12%)
-    let TEA = tasa_interes_anual;
-
-    if (tipo_tasa && tipo_tasa.toLowerCase() === "nominal") {
-      // si capitalizacion es "mensual" o número m
-      const m = (capitalizacion === "mensual") ? 12 : (Number(capitalizacion) || 12);
-      if (typeof calc.nominalToTEA === "function") {
-        TEA = calc.nominalToTEA(tasa_interes_anual, m);
-      } else if (typeof calc.convertirTasa === "function") {
-        TEA = calc.convertirTasa({ tipo: 'TNA_TO_TEA', tasa: tasa_interes_anual, capitalizaciones: m });
-      } else {
-        // fallback
-        TEA = Math.pow(1 + tasa_interes_anual / m, m) - 1;
-      }
-    }
-
-    // TEM: tasa por periodo según frecuencia de pago (si mensual)
-    const cuotasPorAnio = frecuencia_pago === "mensual" ? 12 : 1;
-    let tasaPeriodo;
-    if (cuotasPorAnio === 12) {
-      tasaPeriodo = (typeof calc.teaToTEM === "function") ? calc.teaToTEM(TEA) : Math.pow(1 + TEA, 1 / 12) - 1;
-    } else {
-      // anual (o 1) -> tasaPeriodo = TEA
-      tasaPeriodo = TEA;
-    }
-
-    // -------------------- MONTO FINANCIADO --------------------
-    const monto_prestamo = round(precio_venta - cuota_inicial - bono_aplicable, 2);
-    if (monto_prestamo <= 0) throw new Error("Monto a financiar debe ser mayor a 0");
-
-    // -------------------- MANEJO DE PERIODO DE GRACIA --------------------
-    // Tipo gracia: "SIN_GRACIA", "TOTAL", "PARCIAL"
-    let saldoInicial = monto_prestamo;
-    const nTotal = num_anios * cuotasPorAnio;
-    const mesesGracia = Math.max(0, Number(meses_gracia) || 0);
-
-    // if TOTAL: capitalizamos intereses durante los meses de gracia (intereses añadidos al principal)
-    // if PARCIAL: asumimos que durante meses de gracia sólo se pagan intereses (sin amortizar principal)
-    // if SIN_GRACIA: nada
-    // *Nota*: meses_gracia debe estar en número de periodos (coincide con cuota freq)
-    if (tipo_gracia === "TOTAL" && mesesGracia > 0) {
-      saldoInicial = saldoInicial * Math.pow(1 + tasaPeriodo, mesesGracia);
-    }
-
-    // -------------------- CALCULAR CUOTA FIJA (METODO FRANCES) --------------------
-    const totalCuotas = nTotal;
-    const cuotaFija = round(calc.metodoFrances(saldoInicial, tasaPeriodo, totalCuotas), 2);
-
-    // -------------------- CONSTRUIR TABLA DE AMORTIZACIÓN Y FLUJOS REALES ----
-    const cuotas = [];
-    const flujos = [];
-
-    // Primer flujo: desembolso (salida negativa) -> consideramos desembolso neto recibido por cliente:
-    // en muchos casos se considera que cliente recibe el préstamo y paga costos iniciales: flujo inicial = - (monto_prestamo - costos_ descontados)
-    // Para indicadores conviene considerar flujo0 = - (monto_prestamo - costos_iniciales pagados por cliente)
-    let costoInicialTotal = 0;
-    if (costoInicial) {
-      costoInicialTotal =
-        (Number(costoInicial.costes_notariales) || 0) +
-        (Number(costoInicial.costes_registrales) || 0) +
-        (Number(costoInicial.tasacion) || 0) +
-        (Number(costoInicial.comision_estudio) || 0) +
-        (Number(costoInicial.comision_activacion) || 0) +
-        (Number(costoInicial.seguro_riesgo) || 0);
-    }
-
-    // flujo0: desembolso negativo (prestamo pagado al constructor), menos costos iniciales que cliente debe pagar (salida)
-    // definimos flujo0 = - monto_prestamo - costos_iniciales (cliente sale con el pago)
-    const flujo0 = monto_prestamo - costoInicialTotal;
-    flujos.push(flujo0);
-
-    // Generar cuotas periódicas
-    let saldo = saldoInicial;
-
-    for (let i = 1; i <= totalCuotas; i++) {
-      // Si hay periodo de gracia PARCIAL: durante mesesGracia primeros periodos no amortizas principal (solo pagas interés)
-      let interesPeriodo = saldo * tasaPeriodo;
-      let amortizacion = cuotaFija - interesPeriodo;
-      let cuotaPeriodo = cuotaFija;
-
-      if (tipo_gracia === "PARCIAL" && i <= mesesGracia) {
-        // pago de interés solamente -> amortizacion = 0, cuota = interes
-        amortizacion = 0;
-        cuotaPeriodo = interesPeriodo;
-      }
-      if (tipo_gracia === "TOTAL" && i <= mesesGracia) {
-        // si fue TOTAL y capitalizamos: amortizacion y cuota siguen siendo calculadas con saldoInicial ya aumentado
-        // (ya lo modelamos al principio)
-      }
-
-      // seguros/comisiones:
-      const seguro_desgravamen = (entidad.aplica_seguro_desgravamen) ? (Number(entidad.seguro_desgravamen) || 0) * saldo : 0;
-      // entidad puede no tener seguro_desgravamen numérico; asumimos en modelo que entidad no guarda porcentaje, sino booleano.
-      // si no está definido, toma 0.
-
-      const seguro_inmueble = (costoPeriodico && Number(costoPeriodico.seguro_contra_todo_riesgo)) || 0;
-      const comision_periodica = (costoPeriodico && Number(costoPeriodico.comision_periodica)) || (Number(entidad.comision_mensual) || 0);
-      const portes = (costoPeriodico && Number(costoPeriodico.portes)) || 0;
-      const gastos_administrativos = (costoPeriodico && Number(costoPeriodico.gastos_administrativos)) || 0;
-
-      // cuota real a pagar = cuotaFija + seguros + comisiones + portes + gastos
-      const cuotaReal = -( cuotaFija + seguro_desgravamen + seguro_inmueble + comision_periodica + portes + gastos_administrativos );
-
-      // si PARCIAL y periodo dentro de gracia, cuotaFija usada arriba would be replaced by interes only
-      const cuotaPago = (tipo_gracia === "PARCIAL" && i <= mesesGracia) ? -(interesPeriodo + seguro_desgravamen + seguro_inmueble + comision_periodica + portes + gastos_administrativos) : cuotaReal;
-
-      // saldo final si no es periodo parcial de gracia
-      if (!(tipo_gracia === "PARCIAL" && i <= mesesGracia)) {
-        saldo = round(saldo - amortizacion, 6); // mantener precisión en cálculo interno
-      }
-
-      const cuotaObj = {
-        numero: i,
-        saldo_inicial: round((saldo + amortizacion), 2), // saldo antes de amortizar
-        saldo_inicial_indexado: round((saldo + amortizacion), 2),
-        interes: round(interesPeriodo, 2),
-        cuota: round(Math.abs(cuotaPago), 2),
-        amortizacion: round(amortizacion, 2),
-        prepago: 0,
-        seguro_desgravamen: round(seguro_desgravamen, 2),
-        comision: round(comision_periodica, 2),
-        saldo_final: round(saldo, 2),
-        flujo: round(cuotaPago, 2)
-      };
-
-      cuotas.push(cuotaObj);
-      // flujos para indicadores: usamos el signo (negativo para salida)
-      flujos.push(cuotaObj.flujo);
-    }
-
-    // -------------------- INDICADORES FINANCIEROS --------------------
-    // Nota: calc.tir espera flujos con signo (primero negativo/positivo)
-    const tasaDescPeriodo = tasaPeriodo; // para van se usa tasaPeriodo
-    const van = (typeof calc.van === "function") ? round(calc.van(flujos, tasaDescPeriodo), 2) : round(
-      flujos.reduce((acc, f, t) => acc + f / Math.pow(1 + tasaDescPeriodo, t), 0), 2
+    // Guardar PlanPago
+    const plan = await PlanPago.create(
+      {
+        precio_venta: money(precio_venta),
+        cuota_inicial: money(cuota_inicial),
+        bono_aplicable: money(bono_aplicable),
+        monto_prestamo: money(monto_prestamo_bruto),
+        num_anios,
+        cuotas_por_anio,
+        frecuencia_pago,
+        total_cuotas,
+        dias_por_anio: 360,
+        cuota_fija: money(cuotaFija),
+        total_intereses: money(cuotas.reduce((acc, c) => acc + toNum(c.interes), 0)),
+        moneda: local.moneda || entidad.moneda || "PEN",
+        tipo_gracia: tipoGracia || "SIN_GRACIA",
+        meses_gracia: mesesGracia,
+        entidadFinancieraId: entidad.id,
+        userId: user.id,
+        localId: local.id,
+      },
+      { transaction: t }
     );
 
-    const tir = (typeof calc.tir === "function") ? calc.tir(flujos) : null;
-    const tcea = (typeof calc.TCEA === "function" && tir != null) ? calc.TCEA(tir) : null;
-    const duracion = (typeof calc.Duracion === "function") ? calc.Duracion(flujos, tasaDescPeriodo) : null;
-    const convexidad = (typeof calc.Convexidad === "function") ? calc.Convexidad(flujos, tasaDescPeriodo) : null;
+    // Guardar Cuotas (bulk)
+    const cuotasToInsert = cuotas.map((c) => ({
+      numero: c.numero,
+      saldo_inicial: money(c.saldo_inicial),
+      saldo_inicial_indexado: money(c.saldo_inicial_indexado),
+      interes: money(c.interes),
+      cuota: money(c.cuota),
+      amortizacion: money(c.amortizacion),
+      prepago: money(c.prepago || 0),
+      seguro_desgravamen: money(c.seguro_desgravamen || 0),
+      seguro_riesgo: money(c.seguro_riesgo || 0),
+      comision: money(c.comision || 0),
+      portes: money(c.portes || 0),
+      gastos_administrativos: money(c.gastos_administrativos || 0),
+      saldo_final: money(c.saldo_final),
+      flujo: money(c.flujo),
+      planId: plan.id,
+    }));
 
-    // -------------------- GUARDAR EN BD (TRANSACCIÓN) --------------------
-    const plan = await PlanPago.create({
-      precio_venta,
-      cuota_inicial,
-      monto_prestamo,
-      num_anios,
-      cuotas_por_anio: cuotasPorAnio,
-      frecuencia_pago,
-      total_cuotas: totalCuotas,
-      dias_por_anio: 360,
-      bono_aplicable,
-      cuota_fija: round(cuotaFija, 2),
-      total_intereses: round(cuotas.reduce((acc, c) => acc + Number(c.interes || 0), 0), 2),
-      moneda: moneda || (entidad.moneda || local.moneda || "PEN"),
-      tipo_gracia,
-      meses_gracia,
-      entidadFinancieraId: entidad.id,
-      userId: usuario.id,
-      localId: local.id
-    }, { transaction: t });
+    // bulkCreate en lotes si son muchas cuotas
+    await Cuota.bulkCreate(cuotasToInsert, { transaction: t });
 
-    // create de cuotas
-    for (const c of cuotas) {
-      await Cuota.create({
-        ...c,
-        planId: plan.id
-      }, { transaction: t });
-    }
-
-    // guardar indicadores
-    await IndicadorFinanciero.create({
-      tir: tir == null ? null : round(tir, 6),
-      van: van == null ? null : round(van, 2),
-      tcea: tcea == null ? null : round(tcea, 6),
-      trea: tir == null ? null : round(tir, 6),
-      duracion: duracion == null ? null : round(duracion, 6),
-      convexidad: convexidad == null ? null : round(convexidad, 6),
-      tea: TEA == null ? null : round(TEA, 6),
-      tasa_descuento: tasaDescPeriodo == null ? null : round(tasaDescPeriodo, 6),
-      planId: plan.id
-    }, { transaction: t });
+    // Guardar Indicadores
+    await IndicadorFinanciero.create(
+      {
+        tir: tir == null ? null : Number(Number(tir).toFixed(6)),
+        van: van == null ? null : money(van),
+        tcea: tcea == null ? null : money(tcea),
+        trea: tir == null ? null : Number(Number(tir).toFixed(6)), // ejemplo TREa = tir 
+        duracion: duracion == null ? null : duracion,
+        convexidad: convexidad == null ? null : convexidad,
+        tea: TEA == null ? null : Number(Number(TEA).toFixed(6)),
+        tasa_descuento: tasa_descuento_periodica == null ? null : Number(Number(tasa_descuento_periodica).toFixed(6)),
+        planId: plan.id,
+      },
+      { transaction: t }
+    );
 
     await t.commit();
 
+    // devolver estructura similar a la que se espera en el controlador
     return {
-      plan,
+      plan: {
+        id: plan.id,
+        precio_venta: money(precio_venta),
+        cuota_inicial: money(cuota_inicial),
+        bono_aplicable: money(bono_aplicable),
+        monto_prestamo: money(monto_prestamo_bruto),
+        num_anios,
+        cuotas_por_anio,
+        frecuencia_pago,
+        total_cuotas,
+        dias_por_anio: 360,
+        cuota_fija: money(cuotaFija),
+        total_intereses: money(cuotas.reduce((acc, c) => acc + toNum(c.interes), 0)),
+        entidadFinancieraId: entidad.id,
+        userId: user.id,
+        localId: local.id,
+      },
       cuotas,
       indicadores: {
         van,
         tir,
         tcea,
         duracion,
-        convexidad
-      }
+        convexidad,
+      },
+      flujoInicial,
     };
   } catch (err) {
     await t.rollback();
+    console.error("Error guardando plan en BD:", err);
     throw err;
   }
-}
+};
