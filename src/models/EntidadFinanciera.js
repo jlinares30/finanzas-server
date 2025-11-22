@@ -62,6 +62,11 @@ const EntidadFinanciera = sequelize.define(
       allowNull: false,
       defaultValue: false,
     },
+    seguro_desgravamen: {
+      type: DataTypes.DECIMAL(10, 6),
+      allowNull: true,
+    },
+    //regla si aplica bono techo propio
     aplica_bono_techo_propio: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
