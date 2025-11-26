@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 
 export async function register(req, res) {
   const {name, email, password, gender, birthdate, age, dni } = req.body;
+
+    console.log(req.body);
     try {
         const hashedPassword = await _hash(password, 10);
         const newUser = await User.create({
@@ -15,8 +17,22 @@ export async function register(req, res) {
             age,
             dni
         });
-        console.log(newUser);
-        res.status(201).json({ message: 'User created successfully' });
+            const token = jwt.sign(
+                { id: newUser.id }, 
+                process.env.JWT_SECRET, 
+                { expiresIn: "1d" }
+            );
+            console.log("token ", token);
+            res.status(201).json({
+            success: true,
+            token,
+            user: {
+                id: newUser.id,
+                name: newUser.name,
+                email: newUser.email
+            }
+            });
+        console.log(res, token);
     } catch (error) {
         res.status(400).json({ error: 'Email already in use' });
     }

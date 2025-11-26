@@ -1,5 +1,7 @@
 import EntidadFinanciera from '../models/EntidadFinanciera.js';
 import Local from '../models/Local.js';
+import CostoInicial from '../models/CostoInicial.js';
+import CostoPeriodico from '../models/CostoPeriodico.js';
 
   // GET /api/catalog/entidades-financieras
 export async function getEntidadesFinancieras(req, res) {
@@ -22,11 +24,11 @@ export async function getEntidadesFinancieras(req, res) {
     try {
       const locales = await Local.findAll({ 
         where: { /* condiciones si las hay */ },
-        include: [CostoInicial, CostoPeriodico] // Incluir costos asociados
       });
       
       res.json({ locales });
     } catch (error) {
+      console.error("ERROR GET /locales:", error); 
       res.status(500).json({ error: error.message });
     }
   }

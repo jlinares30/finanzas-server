@@ -4,7 +4,7 @@ import authMiddleware from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-router.post('/socioeconomico', authMiddleware, createSocioeconomico);
+router.post('/socioeconomico', createSocioeconomico);
 router.post('/hogar', authMiddleware, createHogar);
 router.get('/perfil', authMiddleware, getCompleteProfile);
 

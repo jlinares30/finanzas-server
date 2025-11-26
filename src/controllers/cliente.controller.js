@@ -5,8 +5,9 @@ import Hogar from '../models/Hogar.js';
     // POST /api/client/socioeconomico
   export async function createSocioeconomico(req, res) {
     try {
-      const { ocupacion, ingresos_mensuales, tipo_contrato, nivel_educativo } = req.body;
-      const userId = req.userId;
+      const { ocupacion, ingresos_mensuales, tipo_contrato, nivel_educativo, userId } = req.body;
+
+      console.log("req ", req.body);
 
       const socioeconomico = await Socioeconomico.create({
         ocupacion,
