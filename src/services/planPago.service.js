@@ -58,7 +58,7 @@ function getMFromCapitalizacion(cap) {
 }
 
 export const generarPlanPagoService = async (data) => {
-  const {
+  let {
     localId,
     userId,
     entidadFinancieraId,
@@ -97,7 +97,10 @@ export const generarPlanPagoService = async (data) => {
   if (monedaLocal !== monedaBanco) {
     // Opción B (Pro): Convertir precio_venta usando un tipo de cambio
     const tipoCambio = 3.85;
-    precio_venta = monedaLocal === 'USD' ? precio_venta * tipoCambio : precio_venta;
+    if (monedaLocal === 'USD') {
+      precio_venta = precio_venta * tipoCambio;
+      cuota_inicial = cuota_inicial * tipoCambio;
+    }
   }
 
   // -------------------- OBTENER COSTOS DEFINIDOS PARA EL LOCAL --------------------
@@ -128,6 +131,7 @@ export const generarPlanPagoService = async (data) => {
   // --- TEM: tasa por periodo de pago (mensual si frecuencia_pago mensual) ---
   // Normalizamos: frecuencia_pago 'mensual' => periodo mensual
   const periodoPorAnno = frecuencia_pago === "mensual" ? 12 : 1; // si soportas otras frecuencias, ampliar
+
   // convertimos TEA -> tasa por periodo (TEM)
   if (!calc.teaToTEM) throw new Error("Falta función teaToTEM en FinancialCalculatorService");
   const TEM = calc.teaToTEM(TEA, periodoPorAnno === 12 ? 12 : periodoPorAnno); // la impl puede ignorar 2o arg

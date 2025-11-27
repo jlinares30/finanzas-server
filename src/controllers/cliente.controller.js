@@ -2,62 +2,111 @@ import User from '../models/User.js';
 import Socioeconomico from '../models/Socioeconomico.js';
 import Hogar from '../models/Hogar.js';
 
-    // POST /api/client/socioeconomico
-  export async function createSocioeconomico(req, res) {
-    try {
-      const { ocupacion, ingresos_mensuales, tipo_contrato, nivel_educativo, userId } = req.body;
+// POST /api/client/socioeconomico
+export async function createSocioeconomico(req, res) {
+  try {
+    const { ocupacion, ingresos_mensuales, tipo_contrato, nivel_educativo, userId } = req.body;
 
-      console.log("req ", req.body);
+    console.log("req ", req.body);
 
-      const socioeconomico = await Socioeconomico.create({
-        ocupacion,
-        ingresos_mensuales,
-        tipo_contrato,
-        nivel_educativo,
-        userId
-      });
+    const socioeconomico = await Socioeconomico.create({
+      ocupacion,
+      ingresos_mensuales,
+      tipo_contrato,
+      nivel_educativo,
+      userId
+    });
 
-      res.status(201).json({
-        message: 'Información socioeconómica guardada',
-        socioeconomico
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
+    res.status(201).json({
+      message: 'Información socioeconómica guardada',
+      socioeconomico
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
+}
 
-  // POST /api/client/hogar
-  export async function createHogar(req, res) {
-    try {
-      const { num_personas, tipo_vivienda } = req.body;
-      const userId = req.userId;
+// POST /api/client/hogar
+export async function createHogar(req, res) {
+  try {
+    const { num_personas, tipo_vivienda } = req.body;
+    const userId = req.userId;
 
-      const hogar = await Hogar.create({
-        num_personas,
-        tipo_vivienda,
-        userId
-      });
+    const hogar = await Hogar.create({
+      num_personas,
+      tipo_vivienda,
+      userId
+    });
 
-      res.status(201).json({
-        message: 'Información del hogar guardada',
-        hogar
-      });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
+    res.status(201).json({
+      message: 'Información del hogar guardada',
+      hogar
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
+}
 
-  // GET /api/client/profile
-  export async function getCompleteProfile(req, res) {
-    try {
-      const userId = req.userId;
+// GET /api/client/profile
+export async function getCompleteProfile(req, res) {
+  try {
+    const userId = req.user.dataValues.id;
 
-      const user = await User.findByPk(userId, {
-        include: [Socioeconomico, Hogar]
-      });
+    const user = await User.findByPk(userId, {
+      include: [Socioeconomico]
+    });
 
-      res.json({ user });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
+    res.json({ user });
+    console.log("user", user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
+}
+
+
+// POST /api/client/profile
+export async function updateProfile(req, res) {
+  try {
+    const { name, lastName, email } = req.body;
+    const userId = req.userId;
+
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    user.name = name;
+    user.lastName = lastName;
+    user.email = email;
+
+    await user.save();
+
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+// POST /api/client/socioeconomico
+export async function updateSocioeconomico(req, res) {
+  try {
+    const { ocupacion, ingresos_mensuales, tipo_contrato, nivel_educativo, userId } = req.body;
+
+    console.log("req ", req.body);
+
+    const socioeconomico = await Socioeconomico.create({
+      ocupacion,
+      ingresos_mensuales,
+      tipo_contrato,
+      nivel_educativo,
+      userId
+    });
+
+    res.status(201).json({
+      message: 'Información socioeconómica guardada',
+      socioeconomico
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
