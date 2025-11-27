@@ -26,13 +26,13 @@ const EntidadFinanciera = sequelize.define(
     // aplica solo para EFECTIVA
     frecuencia_efectiva: {
       type: DataTypes.ENUM(
-      "ANUAL", "SEMESTRAL", "TRIMESTRAL","CUATRIMESTRAL","BIMESTRAL", "MENSUAL"),
+        "ANUAL", "SEMESTRAL", "TRIMESTRAL", "CUATRIMESTRAL", "BIMESTRAL", "MENSUAL"),
       allowNull: true,
     },
     //------------------ SOLO para tasas nominales
     frecuencia_nominal: {
       type: DataTypes.ENUM(
-        "ANUAL", "SEMESTRAL", "TRIMESTRAL","CUATRIMESTRAL","BIMESTRAL", "MENSUAL", "DIARIA"),
+        "ANUAL", "SEMESTRAL", "TRIMESTRAL", "CUATRIMESTRAL", "BIMESTRAL", "MENSUAL", "DIARIA"),
       allowNull: true,
     },
 
@@ -48,7 +48,7 @@ const EntidadFinanciera = sequelize.define(
     // solo aplica si es nominal
     capitalizacion: {
       type: DataTypes.INTEGER,
-      allowNull: true,       
+      allowNull: true,
     },
 
     //----------------------------
@@ -73,7 +73,7 @@ const EntidadFinanciera = sequelize.define(
       defaultValue: false,
     },
     periodos_gracia_permitidos: {
-      type: DataTypes.ENUM("SIN_GRACIA", "PARCIAL", "TOTAL"),
+      type: DataTypes.ENUM("SIN_GRACIA", "PARCIAL", "TOTAL", "AMBOS"),
       allowNull: false
     },
     max_meses_gracia: {

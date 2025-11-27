@@ -25,6 +25,13 @@ export const generarPlanPago = async (req, res) => {
       });
     }
 
+    // Si es un error lanzado por nosotros (con mensaje), lo devolvemos como 400
+    if (error.message) {
+      return res.status(400).json({
+        message: error.message
+      });
+    }
+
     return res.status(500).json({
       message: "Error interno al generar plan de pago",
       error:
@@ -62,7 +69,7 @@ export const getPlanPagoById = async (req, res) => {
         { model: Cuota },
         { model: IndicadorFinanciero }
       ],
-    }); 
+    });
     if (!plan) {
       return res.status(404).json({ message: "Plan de pago no encontrado" });
     }
@@ -85,7 +92,7 @@ export const eliminarPlanPago = async (req, res) => {
     await plan.destroy();
     res.json({ message: "Plan de pago eliminado correctamente" });
   }
-    catch (error) {
+  catch (error) {
     console.error("Error en eliminarPlanPago:", error);
     res.status(500).json({ message: "Error interno al eliminar el plan de pago" });
   }

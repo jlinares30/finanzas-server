@@ -7,6 +7,7 @@ import Cuota from "../models/Cuota.js";
 import IndicadorFinanciero from "../models/IndicadorFinanciero.js";
 import CostoInicial from "../models/CostoInicial.js";
 import CostoPeriodico from "../models/CostoPeriodico.js";
+import Socioeconomico from "../models/Socioeconomico.js";
 import { sequelize } from "../config/db.js";
 import { FinancialCalculatorService as calc } from "./FinancialCalculatorService.js";
 
@@ -23,6 +24,9 @@ const money = (v) => Number(Number(v).toFixed(2));
 /**
  * Devuelve m (capitalizaciones) a partir de capitalization enum o número
  */
+
+const monto_bono_oficial = 46545; // monto oficial del programa BFH/Techo Propio
+
 function getMFromCapitalizacion(cap) {
 
   if (typeof cap === "number") return cap;
@@ -60,7 +64,7 @@ export const generarPlanPagoService = async (data) => {
     entidadFinancieraId,
     precio_venta,
     cuota_inicial = 0,
-    bono_aplicable = 0,
+    bono_aplicable = false,
     num_anios,
     frecuencia_pago = "mensual",
     // tipo_tasa: 'EFECTIVA'|'NOMINAL' - si no viene, se toma de la entidad
@@ -85,9 +89,21 @@ export const generarPlanPagoService = async (data) => {
   const user = await User.findByPk(userId);
   if (!user) throw new Error("Usuario no encontrado");
 
+  // -------------------- VALIDACIONES MONEDAS -------------------
+
+  const monedaLocal = local.moneda; // 'PEN' | 'USD'
+  const monedaBanco = entidad.moneda; // 'PEN' | 'USD'
+
+  if (monedaLocal !== monedaBanco) {
+    // Opción B (Pro): Convertir precio_venta usando un tipo de cambio
+    const tipoCambio = 3.85;
+    precio_venta = monedaLocal === 'USD' ? precio_venta * tipoCambio : precio_venta;
+  }
+
   // -------------------- OBTENER COSTOS DEFINIDOS PARA EL LOCAL --------------------
   const costoInicial = (await CostoInicial.findOne({ where: { localId } })) || null;
   const costoPeriodico = (await CostoPeriodico.findOne({ where: { localId } })) || null;
+  const socioeconomico = (await Socioeconomico.findOne({ where: { userId } })) || null;
 
   // -------------------- DETERMINAR TASAS A USAR --------------------
   // Prioriza los valores pasados en body; si no vienen usa los de la entidad
@@ -115,15 +131,30 @@ export const generarPlanPagoService = async (data) => {
   // convertimos TEA -> tasa por periodo (TEM)
   if (!calc.teaToTEM) throw new Error("Falta función teaToTEM en FinancialCalculatorService");
   const TEM = calc.teaToTEM(TEA, periodoPorAnno === 12 ? 12 : periodoPorAnno); // la impl puede ignorar 2o arg
-  
+
   // -------------------- MONTO FINANCIADO / BONO --------------------
   // Validar si entidad permite bono
-  if (toNum(bono_aplicable) > 0 && !entidad.aplica_bono_techo_propio) {
-    throw new Error("Entidad financiera no permite bono techo propio");
+
+  let monto_bono = 0;
+  if (bono_aplicable) {
+    if (!entidad.aplica_bono_techo_propio) {
+      throw new Error("Banco no permite BFH/Techo Propio");
+    }
+
+    if (socioeconomico.ingresos_mensuales > 3715) {
+      throw new Error("No califica por ingresos familiares altos");
+    }
+
+    if (precio_venta > 128900) {
+      throw new Error("No califica porque el inmueble supera el tope del programa");
+    }
+
+    // se aplica monto oficial del programa
+    monto_bono = monto_bono_oficial;
   }
 
   // monto prestamo bruto solicitado (precio - cuota inicial - bono)
-  const monto_prestamo_bruto = money(toNum(precio_venta) - toNum(cuota_inicial) - toNum(bono_aplicable));
+  const monto_prestamo_bruto = money(toNum(precio_venta) - toNum(cuota_inicial) - toNum(monto_bono));
   if (monto_prestamo_bruto <= 0) {
     throw new Error("Monto del préstamo inválido o <= 0");
   }
@@ -142,7 +173,7 @@ export const generarPlanPagoService = async (data) => {
   // Sumatorias
   const initialCostsPaidByClient = money(costesNotariales + costesRegistrales + tasacion + seguroRiesgoInicial + comisionEstudio);
   const initialCostsFinanced = money(comisionActivacion); // se descuenta del desembolso
-  
+
   // Nota: ajustar según regla real: algunas entidades descuentan comisiones del préstamo, otras no.
 
   // -------------------- MONTOS NETOS AL DESEMBOLSO (LO QUE RECIBE CLIENTE) --------------------
@@ -157,6 +188,26 @@ export const generarPlanPagoService = async (data) => {
   // periodo_gracia: { tipo: "SIN_GRACIA"/"PARCIAL"/"TOTAL", meses: n }
   const tipoGracia = (periodo_gracia && periodo_gracia.tipo) ? periodo_gracia.tipo : "SIN_GRACIA";
   const mesesGracia = (periodo_gracia && periodo_gracia.meses) ? toNum(periodo_gracia.meses) : 0;
+
+  // Obtenemos lo que permite el banco (puede ser 'SIN_GRACIA', 'PARCIAL', 'TOTAL' o 'AMBOS')
+  const permitidoPorBanco = entidad.periodos_gracia_permitidos;
+
+  // Si el usuario pidió gracia (meses > 0), validamos que el tipo sea correcto
+  if (mesesGracia > 0) {
+    let esValido = false;
+
+    if (permitidoPorBanco === 'AMBOS') {
+      // Si el banco permite AMBOS, el usuario puede pedir TOTAL o PARCIAL
+      if (tipoGracia === 'TOTAL' || tipoGracia === 'PARCIAL') esValido = true;
+    } else {
+      // Si no es AMBOS, debe coincidir exactamente (ej: Banco dice 'TOTAL', usuario pide 'TOTAL')
+      if (tipoGracia === permitidoPorBanco) esValido = true;
+    }
+
+    if (!esValido) {
+      throw new Error(`El banco no permite el tipo de gracia '${tipoGracia}'. Permitido: ${permitidoPorBanco}`);
+    }
+  }
 
   if (mesesGracia > (entidad.max_meses_gracia || 0)) {
     throw new Error(`Entidad permite máximo ${entidad.max_meses_gracia || 0} meses de gracia`);
@@ -242,9 +293,10 @@ export const generarPlanPagoService = async (data) => {
       cuota = interes;
     }
 
+    const costoSeguroTodoRiesgo = costoPeriodico ? toNum(costoPeriodico.seguro_contra_todo_riesgo || 0) : 0;
+    const seguro_riesgo_periodico = costoSeguroTodoRiesgo;
     // seguros/comisiones/gastos periódicos se suman
     const seguro_desgravamen = aplicaSeguroDesgrav ? money(seguroDesgravPorcentaje * saldo) : 0;
-    const seguro_riesgo_periodico = toNum(entidad.seguro_inmueble || 0); // si existiera
     const comision_total = money(entidadComisionMensual + costoPeriodoComision);
     const portes = money(costoPeriodoPortes);
     const gastosAdmin = money(entidadGastosAdministrativos + costoPeriodoGastosAdministrativos);
@@ -367,7 +419,7 @@ export const generarPlanPagoService = async (data) => {
       {
         precio_venta: money(precio_venta),
         cuota_inicial: money(cuota_inicial),
-        bono_aplicable: money(bono_aplicable),
+        bono_aplicable: money(monto_bono),
         monto_prestamo: money(monto_prestamo_bruto),
         num_anios,
         cuotas_por_anio,
@@ -432,7 +484,7 @@ export const generarPlanPagoService = async (data) => {
         id: plan.id,
         precio_venta: money(precio_venta),
         cuota_inicial: money(cuota_inicial),
-        bono_aplicable: money(bono_aplicable),
+        bono_aplicable: money(monto_bono),
         monto_prestamo: money(monto_prestamo_bruto),
         num_anios,
         cuotas_por_anio,
