@@ -67,8 +67,8 @@ export async function getCompleteProfile(req, res) {
 // POST /api/client/profile
 export async function updateProfile(req, res) {
   try {
-    const { name, lastName, email } = req.body;
-    const userId = req.userId;
+    const { name, email, dni, age, gender, birthdate } = req.body;
+    const { userId } = req.params;
 
     const user = await User.findByPk(userId);
     if (!user) {
@@ -76,8 +76,11 @@ export async function updateProfile(req, res) {
     }
 
     user.name = name;
-    user.lastName = lastName;
     user.email = email;
+    user.dni = dni;
+    user.age = age;
+    user.gender = gender;
+    user.birthdate = birthdate;
 
     await user.save();
 
@@ -90,20 +93,31 @@ export async function updateProfile(req, res) {
 // POST /api/client/socioeconomico
 export async function updateSocioeconomico(req, res) {
   try {
-    const { ocupacion, ingresos_mensuales, tipo_contrato, nivel_educativo, userId } = req.body;
+    const { ocupacion, ingresos_mensuales, tipo_contrato, nivel_educativo } = req.body;
+    const { userId } = req.params;
 
     console.log("req ", req.body);
 
-    const socioeconomico = await Socioeconomico.create({
-      ocupacion,
-      ingresos_mensuales,
-      tipo_contrato,
-      nivel_educativo,
-      userId
-    });
+    let socioeconomico = await Socioeconomico.findOne({ where: { userId } });
 
-    res.status(201).json({
-      message: 'Información socioeconómica guardada',
+    if (socioeconomico) {
+      socioeconomico.ocupacion = ocupacion;
+      socioeconomico.ingresos_mensuales = ingresos_mensuales;
+      socioeconomico.tipo_contrato = tipo_contrato;
+      socioeconomico.nivel_educativo = nivel_educativo;
+      await socioeconomico.save();
+    } else {
+      socioeconomico = await Socioeconomico.create({
+        ocupacion,
+        ingresos_mensuales,
+        tipo_contrato,
+        nivel_educativo,
+        userId
+      });
+    }
+
+    res.status(200).json({
+      message: 'Información socioeconómica actualizada',
       socioeconomico
     });
   } catch (error) {

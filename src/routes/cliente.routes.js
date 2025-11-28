@@ -7,9 +7,8 @@ const router = Router();
 router.post('/socioeconomico', createSocioeconomico);
 router.post('/house', authMiddleware, createHogar);
 router.get('/profile/:userId', authMiddleware, getCompleteProfile);
-router.post('/profile/:userId', authMiddleware, updateProfile);
-router.post('/socioeconomico/:userId', authMiddleware, updateSocioeconomico);
-
+router.put('/profile/:userId', authMiddleware, updateProfile);
+router.put('/socioeconomico/:userId', authMiddleware, updateSocioeconomico);
 
 
 export default router;
