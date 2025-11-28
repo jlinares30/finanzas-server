@@ -23,7 +23,7 @@ const money = (v) => Number(Number(v).toFixed(2));
 /**
  * Devuelve m (capitalizaciones) a partir de capitalization enum o número
  */
-const monto_bono_oficial = 46545; // Actualizado 2024/25
+const MONTO_BONO_OFICIAL = 46545; // Actualizado 2024/25
 
 function getMFromCapitalizacion(cap) {
   if (typeof cap === "number") return cap;
@@ -73,19 +73,17 @@ export const generarPlanPagoService = async (data) => {
   if (!user) throw new Error("Usuario no encontrado");
 
   // -------------------- GESTIÓN DE MONEDAS -------------------
-  const monedaLocal = local.moneda; // 'PEN' | 'USD'
-  const monedaBanco = entidad.moneda; // 'PEN' | 'USD'
+  const monedaLocal = local.moneda;
+  const monedaBanco = entidad.moneda;
 
   if (monedaLocal !== monedaBanco) {
     const tc = toNum(tipo_cambio) || 3.85;
 
     if (monedaLocal === 'USD' && monedaBanco === 'PEN') {
-      // Casa en Dólares, Préstamo en Soles
       precio_venta = money(precio_venta * tc);
       cuota_inicial = money(cuota_inicial * tc);
     }
     else if (monedaLocal === 'PEN' && monedaBanco === 'USD') {
-      // Casa en Soles, Préstamo en Dólares
       precio_venta = money(precio_venta / tc);
       cuota_inicial = money(cuota_inicial / tc);
     }
@@ -115,7 +113,7 @@ export const generarPlanPagoService = async (data) => {
   const tasa_origen = tasa_input != null ? toNum(tasa_input) : toNum(entidad.tasa_interes);
   const capitalizacion = capitalizacion_input ?? entidad.capitalizacion ?? 12;
 
-  // A. Calcular TEA (Tasa Efectiva Anual)
+  // Calcular TEA (Tasa Efectiva Anual)
   let TEA = tasa_origen;
   if (tipo_tasa === "NOMINAL") {
     const m = getMFromCapitalizacion(capitalizacion);
@@ -123,7 +121,7 @@ export const generarPlanPagoService = async (data) => {
     TEA = calc.nominalToTEA(tasa_origen, m);
   }
 
-  // B. Calcular TEP (Tasa Efectiva del Periodo)
+  // Calcular TEP (Tasa Efectiva del Periodo)
   // Usamos la variable unificada 'cuotas_por_anio'
   if (!calc.teaToTEP) throw new Error("Falta función teaToTEP en FinancialCalculatorService");
   const TEP = calc.teaToTEP(TEA, cuotas_por_anio);
@@ -133,9 +131,25 @@ export const generarPlanPagoService = async (data) => {
   if (bono_aplicable) {
     if (!entidad.aplica_bono_techo_propio) throw new Error("Banco no permite BFH/Techo Propio");
     if (socioeconomico.ingresos_mensuales > 3715) throw new Error("No califica por ingresos familiares altos");
-    if (precio_venta > 128900) throw new Error("No califica porque el inmueble supera el tope del programa");
 
-    monto_bono = monto_bono_oficial;
+    const LIMITE_PRECIO_PEN = 128900;
+    let limite_comparacion = LIMITE_PRECIO_PEN;
+
+    if (monedaBanco === 'USD') {
+      const tc = toNum(tipo_cambio) || 3.85;
+      limite_comparacion = LIMITE_PRECIO_PEN / tc;
+    }
+
+    if (precio_venta > limite_comparacion) {
+      throw new Error(`No califica porque el inmueble supera el tope del programa (${monedaBanco === 'PEN' ? 'S/' : '$'} ${money(limite_comparacion)})`);
+    }
+
+    monto_bono = MONTO_BONO_OFICIAL;
+
+    if (monedaBanco === 'USD') {
+      const tc = toNum(tipo_cambio) || 3.85;
+      monto_bono = money(monto_bono / tc);
+    }
   }
 
   const monto_prestamo_bruto = money(toNum(precio_venta) - toNum(cuota_inicial) - toNum(monto_bono));
@@ -155,7 +169,6 @@ export const generarPlanPagoService = async (data) => {
   const monto_neto_desembolso = money(monto_prestamo_bruto - initialCostsFinanced);
 
   // -------------------- PERIODOS Y GRACIA --------------------
-  // Usamos la misma variable unificada
   const total_cuotas = toNum(num_anios) * cuotas_por_anio;
 
   const tipoGracia = (periodo_gracia && periodo_gracia.tipo) ? periodo_gracia.tipo : "SIN_GRACIA";
@@ -351,7 +364,8 @@ export const generarPlanPagoService = async (data) => {
       localId: local.id,
     }, { transaction: t });
 
-    const cuotasToInsert = cuotas.map(c => ({ ...c, planId: plan.id, prepago: money(c.prepago || 0) }));
+
+    const cuotasToInsert = cuotas.map(c => ({ ...c, planId: plan.id }));
     await Cuota.bulkCreate(cuotasToInsert, { transaction: t });
 
     await IndicadorFinanciero.create({

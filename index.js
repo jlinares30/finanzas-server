@@ -17,7 +17,6 @@ import Local from "./src/models/Local.js";
 import CostoInicial from "./src/models/CostoInicial.js";
 import CostoPeriodico from "./src/models/CostoPeriodico.js";
 import Socioeconomico from "./src/models/Socioeconomico.js";
-import Hogar from "./src/models/Hogar.js";
 
 
 const app = express();
@@ -31,9 +30,6 @@ async function start() {
 
     User.hasOne(Socioeconomico, { foreignKey: "userId" });
     Socioeconomico.belongsTo(User, { foreignKey: "userId" });
-
-    User.hasOne(Hogar, { foreignKey: "userId" });
-    Hogar.belongsTo(User, { foreignKey: "userId" });
 
     PlanPago.hasMany(Cuota, { foreignKey: "planId" });
     Cuota.belongsTo(PlanPago, { foreignKey: "planId" });

@@ -19,7 +19,7 @@ const Cuota = sequelize.define(
         },
         saldo_inicial_indexado: {
             type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
+            allowNull: true,
         },
         interes: {
             type: DataTypes.DECIMAL(15, 2),
@@ -35,7 +35,7 @@ const Cuota = sequelize.define(
         },
         prepago: {
             type: DataTypes.DECIMAL(15, 2),
-            allowNull: false,
+            allowNull: true,
         },
         seguro_desgravamen: {
             type: DataTypes.DECIMAL(15, 2),
