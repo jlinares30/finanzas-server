@@ -69,10 +69,18 @@ const PlanPago = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    cok: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: true,
+    },
+    tipo_cambio_usado: {
+      type: DataTypes.FLOAT,
+      defaultValue: 1.0
+    },
     userId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-        references: {
+      references: {
         model: "users",
         key: "id",
       },
@@ -80,7 +88,7 @@ const PlanPago = sequelize.define(
     localId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-        references: {
+      references: {
         model: "locales",
         key: "id",
       },
