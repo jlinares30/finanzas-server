@@ -1,10 +1,10 @@
-import {Router } from 'express';
+import { Router } from 'express';
 import { generarPlanPago, getPlanesPagosByUser, getPlanPagoById, eliminarPlanPago, obtenerCuotasPorPlan } from '../controllers/planPagos.controller.js';
 import authMiddleware from '../middlewares/authMiddleware.js';
 
 const router = Router();
 
-router.post('/', generarPlanPago);
+router.post('/', authMiddleware, generarPlanPago);
 router.get('/user/:userId', authMiddleware, getPlanesPagosByUser);
 router.get('/:id', authMiddleware, getPlanPagoById);
 router.delete('/:id', authMiddleware, eliminarPlanPago);

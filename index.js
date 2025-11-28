@@ -50,6 +50,8 @@ async function start() {
     EntidadFinanciera.hasMany(PlanPago, { foreignKey: "entidadFinancieraId" });
     PlanPago.belongsTo(EntidadFinanciera, { foreignKey: "entidadFinancieraId" });
 
+    Local.hasMany(PlanPago, { foreignKey: "localId" });
+    PlanPago.belongsTo(Local, { foreignKey: "localId" });
 
     await sequelize.sync({ alter: true });
     console.log("Tablas sincronizadas correctamente");
