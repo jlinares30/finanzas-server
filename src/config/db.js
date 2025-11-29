@@ -1,7 +1,11 @@
 import { Sequelize } from 'sequelize';
 import { ENV } from './env.js';
 
-const isProduction = process.env.NODE_ENV === 'production' || (ENV.DB_HOST && ENV.DB_HOST.includes('render'));
+const useSSL = process.env.NODE_ENV === 'production' ||
+  (ENV.DB_HOST && ENV.DB_HOST.includes('render'));
+
+console.log(`🔌 Conectando a Base de Datos: ${ENV.DB_HOST}`);
+console.log(`🔒 Modo SSL: ${useSSL ? 'ACTIVADO' : 'DESACTIVADO (Local)'}`);
 
 export const sequelize = new Sequelize(
   ENV.DB_NAME,
@@ -11,26 +15,24 @@ export const sequelize = new Sequelize(
     host: ENV.DB_HOST,
     port: ENV.DB_PORT,
     dialect: 'postgres',
-    logging: false, // Evita llenar los logs de texto SQL
+    logging: false,
 
-    // --- BLOQUE PARA 'ECONNRESET' ---
-    dialectOptions: {
+    // Configuración condicional
+    dialectOptions: useSSL ? {
       ssl: {
         require: true,
         rejectUnauthorized: false
       }
-    }
-    // -------------------------------------------------------
+    } : {} // Si es local, mandamos un objeto vacío (sin SSL)
   }
 );
 
-// Test de conexión para ver en los logs si tuvo éxito
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
     console.log('Conexión a la base de datos establecida correctamente.');
   } catch (error) {
-    console.error('No se pudo conectar a la base de datos:', error);
+    console.error('No se pudo conectar a la base de datos:', error.message);
   }
 };
 
